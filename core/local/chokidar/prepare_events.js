@@ -104,10 +104,31 @@ const step = async (
         }
       }
 
+      if ((e.type === 'add' || e.type === 'addDir') && isEncodingChange(e2)) {
+        log.debug({ path: e2.path, oldPath: e2.old.path }, 'Encoding change')
+        e2.path = e2.old.path
+      }
+
       return e2
     },
     { concurrency: 50 }
   ).filter((e /*: ?LocalEvent */) => e != null)
+}
+
+function isEncodingChange(event /*: Object */) /*: boolean %checks */ {
+  return (
+    event.old != null &&
+    event.path !== event.old.path &&
+    normalize(event.path) === normalize(event.old.path)
+  )
+}
+
+function normalize(p /*: string */) /*: string */ {
+  if (p.normalize) {
+    return p.normalize('NFD')
+  } else {
+    return p
+  }
 }
 
 module.exports = {
