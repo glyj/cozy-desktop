@@ -126,6 +126,10 @@ module.exports = class WindowManager {
     this.log.debug('create')
     const opts = this.windowOptions()
     opts.show = false
+    opts.webPreferences = {
+      ...opts.webPreferences,
+      nodeIntegration: true
+    }
     // https://github.com/AppImage/AppImageKit/wiki/Bundling-Electron-apps
     if (process.platform === 'linux') {
       opts.icon = path.join(__dirname, '../images/icon.png')
