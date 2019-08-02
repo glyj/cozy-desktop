@@ -6,7 +6,6 @@
 
 const Promise = require('bluebird')
 const fse = require('fs-extra')
-const _ = require('lodash')
 const path = require('path')
 
 const metadata = require('../../metadata')
@@ -37,12 +36,12 @@ const oldMetadata = async (
   pouch /*: Pouch */
 ) /*: Promise<?Metadata> */ => {
   if (e.old) return e.old
-  try {
-    return await pouch.db.get(metadata.id(e.path))
-  } catch (err) {
-    if (err.status !== 404) log.error({ path: e.path, err })
-  }
-  return null
+  const old = await pouch.byIdMaybeAsync(metadata.id(e.path))
+  if (old)
+    return {
+      ...old,
+      path: normalize(old.path, 'NFC')
+    }
 }
 
 const step = async (
@@ -54,12 +53,11 @@ const step = async (
     async (e /*: ChokidarEvent */) /*: Promise<?LocalEvent> */ => {
       const abspath = path.join(syncPath, e.path)
 
-      const e2 /*: Object */ = _.merge(
-        {
-          old: await oldMetadata(e, pouch)
-        },
-        e
-      )
+      const e2 /*: Object */ = {
+        ...e,
+        path: normalize(e.path, 'NFC'),
+        old: await oldMetadata(e, pouch)
+      }
 
       if (e.type === 'add' || e.type === 'change') {
         if (
@@ -104,28 +102,16 @@ const step = async (
         }
       }
 
-      if ((e.type === 'add' || e.type === 'addDir') && isEncodingChange(e2)) {
-        log.debug({ path: e2.path, oldPath: e2.old.path }, 'Encoding change')
-        e2.path = e2.old.path
-      }
-
       return e2
     },
     { concurrency: 50 }
   ).filter((e /*: ?LocalEvent */) => e != null)
 }
 
-function isEncodingChange(event /*: Object */) /*: boolean %checks */ {
-  return (
-    event.old != null &&
-    event.path !== event.old.path &&
-    normalize(event.path) === normalize(event.old.path)
-  )
-}
-
-function normalize(p /*: string */) /*: string */ {
+function normalize(p /*: string */, norm /* NFC|NFD */) /*: string */ {
   if (p.normalize) {
-    return p.normalize('NFD')
+    log.info({ path: p, norm }, 'normalizing event path encoding')
+    return p.normalize(norm)
   } else {
     return p
   }
